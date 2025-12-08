@@ -3,10 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <title>Staff Dashboard – PLGA Bone Graft Portal</title>
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="/css/styles.css" />
   </head>
   <body>
@@ -19,12 +16,784 @@
       </header>
 
       <section class="section">
-        <h2 class="section-title">Staff Calendar & Activity Log</h2>
+        <h2 class="section-title">Project Calendar & Activity Log</h2>
         <p class="section-subtitle">
-          This is a placeholder. We will add the full calendar, activity entry
-          and file upload features here in the next step.
+          Use this calendar to record daily project activities and upload
+          supporting documents. Entries here can be exported as a time sheet or
+          activity report.
         </p>
+
+        <div class="dashboard-layout">
+          <!-- Calendar panel -->
+          <div class="calendar-card">
+            <div class="calendar-header">
+              <div class="calendar-month" id="calendarMonthLabel">
+                <!-- Month label -->
+              </div>
+              <div>
+                <button
+                  class="calendar-nav-btn"
+                  id="prevMonthBtn"
+                  type="button"
+                >
+                  ◀
+                </button>
+                <button
+                  class="calendar-nav-btn"
+                  id="todayBtn"
+                  type="button"
+                  style="margin: 0 4px"
+                >
+                  Today
+                </button>
+                <button
+                  class="calendar-nav-btn"
+                  id="nextMonthBtn"
+                  type="button"
+                >
+                  ▶
+                </button>
+              </div>
+            </div>
+            <div class="calendar-grid" id="calendarGrid">
+              <!-- Calendar will be rendered here -->
+            </div>
+          </div>
+
+          <!-- Day details panel -->
+          <div class="day-panel">
+            <div class="day-header">
+              <div>
+                <div class="day-title" id="selectedDateLabel">
+                  <!-- Date text -->
+                </div>
+                <div class="day-subtitle" id="selectedDateSubtitle">
+                  <!-- Subtext -->
+                </div>
+              </div>
+              <button
+                class="btn-small btn-primary"
+                id="addActivityBtn"
+                type="button"
+              >
+                + Add Activity
+              </button>
+            </div>
+
+            <div class="day-stats" id="dayStats"></div>
+
+            <div class="activity-list" id="activityList">
+              <!-- Activities for selected date -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabs for tables -->
+        <div class="tabs" style="margin-top: 24px;">
+          <div class="tab-header">
+            <button
+              class="tab-button active"
+              id="tabActivitiesBtn"
+              type="button"
+            >
+              All Activities (This Month)
+            </button>
+            <button class="tab-button" id="tabFilesBtn" type="button">
+              All Files (This Month)
+            </button>
+          </div>
+
+          <div id="tabActivitiesPanel" class="tab-panel">
+            <div class="table-wrapper">
+              <table class="data-table" id="activitiesTable">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Title</th>
+                    <th>Category</th>
+                    <th>Phase</th>
+                    <th>Status</th>
+                    <th>Notes</th>
+                    <th>Files</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Filled by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div
+            id="tabFilesPanel"
+            class="tab-panel"
+            style="display: none; margin-top: 12px;"
+          >
+            <div class="table-wrapper">
+              <table class="data-table" id="filesTable">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Activity</th>
+                    <th>File Name</th>
+                    <th>Size (KB)</th>
+                    <th>Download</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Filled by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </section>
     </div>
+
+    <!-- Modal container -->
+    <div id="modalContainer" style="display: none;"></div>
+
+    <script>
+      // ====== Global state ======
+      let currentYear;
+      let currentMonth; // 0-11
+      let selectedDateStr; // YYYY-MM-DD
+      let monthActivities = []; // all activities for current month
+
+      const calendarGridEl = document.getElementById("calendarGrid");
+      const calendarMonthLabelEl =
+        document.getElementById("calendarMonthLabel");
+      const selectedDateLabelEl =
+        document.getElementById("selectedDateLabel");
+      const selectedDateSubtitleEl = document.getElementById(
+        "selectedDateSubtitle"
+      );
+      const dayStatsEl = document.getElementById("dayStats");
+      const activityListEl = document.getElementById("activityList");
+      const modalContainerEl = document.getElementById("modalContainer");
+
+      const activitiesTableBody =
+        document.getElementById("activitiesTable").querySelector("tbody");
+      const filesTableBody =
+        document.getElementById("filesTable").querySelector("tbody");
+
+      const tabActivitiesBtn = document.getElementById("tabActivitiesBtn");
+      const tabFilesBtn = document.getElementById("tabFilesBtn");
+      const tabActivitiesPanel = document.getElementById(
+        "tabActivitiesPanel"
+      );
+      const tabFilesPanel = document.getElementById("tabFilesPanel");
+
+      // ====== Utility functions ======
+      function pad2(n) {
+        return n.toString().padStart(2, "0");
+      }
+
+      function formatDateLabel(dateStr) {
+        const [y, m, d] = dateStr.split("-").map((x) => parseInt(x, 10));
+        const date = new Date(y, m - 1, d);
+        const options = { weekday: "long", day: "numeric", month: "long" };
+        return date.toLocaleDateString(undefined, options);
+      }
+
+      function getMonthLabel(year, monthIndex) {
+        const date = new Date(year, monthIndex, 1);
+        const options = { month: "long", year: "numeric" };
+        return date.toLocaleDateString(undefined, options);
+      }
+
+      function getCategoryDotClass(category) {
+        const c = (category || "").toLowerCase();
+        if (c === "experiment") return "dot-experiment";
+        if (c === "analysis" || c === "data analysis") return "dot-analysis";
+        if (c === "meeting") return "dot-meeting";
+        if (c === "literature") return "dot-literature";
+        if (c === "admin" || c === "procurement") return "dot-admin";
+        return "dot-other";
+      }
+
+      // ====== Calendar rendering ======
+      function renderCalendar() {
+        calendarGridEl.innerHTML = "";
+
+        const firstDay = new Date(currentYear, currentMonth, 1);
+        const daysInMonth = new Date(
+          currentYear,
+          currentMonth + 1,
+          0
+        ).getDate();
+
+        // Monday-first layout: convert JS getDay() (0=Sun) => 0=Mon
+        const firstDayIndex = (firstDay.getDay() + 6) % 7;
+
+        const daysFromPrevMonth = firstDayIndex;
+        const totalCells = daysFromPrevMonth + daysInMonth;
+        const rows = Math.ceil(totalCells / 7);
+        const totalGridCells = rows * 7;
+
+        calendarMonthLabelEl.textContent = getMonthLabel(
+          currentYear,
+          currentMonth
+        );
+
+        const headers = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+        headers.forEach((h) => {
+          const el = document.createElement("div");
+          el.className = "calendar-day-header";
+          el.textContent = h;
+          calendarGridEl.appendChild(el);
+        });
+
+        // Precompute stats per date
+        const statsByDate = {};
+        monthActivities.forEach((act) => {
+          const date = act.date;
+          if (!statsByDate[date]) {
+            statsByDate[date] = {
+              count: 0,
+              categories: new Set(),
+              hasAttachments: false,
+            };
+          }
+          statsByDate[date].count += 1;
+          statsByDate[date].categories.add(act.category || "Other");
+          if (act.attachments && act.attachments.length > 0) {
+            statsByDate[date].hasAttachments = true;
+          }
+        });
+
+        let day = 1;
+
+        for (let cellIndex = 0; cellIndex < totalGridCells; cellIndex++) {
+          const cell = document.createElement("div");
+          cell.className = "calendar-cell";
+
+          if (cellIndex < daysFromPrevMonth || day > daysInMonth) {
+            cell.classList.add("other-month");
+            calendarGridEl.appendChild(cell);
+            continue;
+          }
+
+          const dateStr = `${currentYear}-${pad2(
+            currentMonth + 1
+          )}-${pad2(day)}`;
+
+          const dateNumEl = document.createElement("div");
+          dateNumEl.className = "calendar-date-number";
+          dateNumEl.textContent = day;
+          cell.appendChild(dateNumEl);
+
+          const metaEl = document.createElement("div");
+          metaEl.className = "calendar-meta";
+
+          const dotsEl = document.createElement("div");
+          dotsEl.className = "calendar-dots";
+
+          const stat = statsByDate[dateStr];
+          if (stat) {
+            const categories = Array.from(stat.categories).slice(0, 4);
+            categories.forEach((cat) => {
+              const dot = document.createElement("div");
+              dot.className =
+                "calendar-dot " + getCategoryDotClass(cat);
+              dotsEl.appendChild(dot);
+            });
+          }
+
+          metaEl.appendChild(dotsEl);
+
+          const countEl = document.createElement("div");
+          countEl.className = "calendar-count";
+          if (stat && stat.count > 0) {
+            countEl.textContent = `${stat.count}`;
+            if (stat.hasAttachments) {
+              countEl.textContent += " 📎";
+            }
+          } else {
+            countEl.textContent = "";
+          }
+          metaEl.appendChild(countEl);
+
+          cell.appendChild(metaEl);
+
+          if (dateStr === selectedDateStr) {
+            cell.classList.add("selected");
+          }
+
+          cell.addEventListener("click", () => {
+            selectedDateStr = dateStr;
+            updateSelectedDateDisplay();
+            loadDayActivities();
+          });
+
+          calendarGridEl.appendChild(cell);
+          day++;
+        }
+      }
+
+      // ====== Day panel rendering ======
+      function updateSelectedDateDisplay() {
+        selectedDateLabelEl.textContent = formatDateLabel(selectedDateStr);
+        selectedDateSubtitleEl.textContent = selectedDateStr;
+      }
+
+      function renderDayActivities(activities) {
+        activityListEl.innerHTML = "";
+
+        if (!activities || activities.length === 0) {
+          activityListEl.innerHTML =
+            '<p style="font-size:0.85rem;color:#6b7280;">No activities recorded for this date yet.</p>';
+          dayStatsEl.textContent = "";
+          return;
+        }
+
+        const total = activities.length;
+        const completed = activities.filter(
+          (a) =>
+            (a.status || "").toLowerCase() === "completed"
+        ).length;
+
+        dayStatsEl.textContent = `Activities: ${total} (Completed: ${completed})`;
+
+        activities.forEach((act) => {
+          const card = document.createElement("div");
+          card.className = "activity-card";
+
+          const mainRow = document.createElement("div");
+          mainRow.className = "activity-main";
+
+          const titleEl = document.createElement("div");
+          titleEl.className = "activity-title";
+          titleEl.textContent = act.title;
+
+          const timeEl = document.createElement("div");
+          timeEl.className = "activity-time";
+          if (act.startTime || act.endTime) {
+            timeEl.textContent = `${act.startTime || "?"} – ${
+              act.endTime || "?"
+            }`;
+          } else {
+            timeEl.textContent = "";
+          }
+
+          mainRow.appendChild(titleEl);
+          mainRow.appendChild(timeEl);
+          card.appendChild(mainRow);
+
+          const tagsRow = document.createElement("div");
+          tagsRow.className = "activity-tags";
+
+          const catChip = document.createElement("span");
+          catChip.className = "tag-chip tag-category";
+          catChip.textContent = act.category || "Other";
+          tagsRow.appendChild(catChip);
+
+          const phaseChip = document.createElement("span");
+          phaseChip.className = "tag-chip tag-phase";
+          phaseChip.textContent = act.phase || "Unspecified";
+          tagsRow.appendChild(phaseChip);
+
+          const statusChip = document.createElement("span");
+          statusChip.className = "tag-chip tag-status";
+          statusChip.textContent = act.status || "Planned";
+          tagsRow.appendChild(statusChip);
+
+          card.appendChild(tagsRow);
+
+          if (act.notes) {
+            const notesEl = document.createElement("div");
+            notesEl.className = "activity-notes";
+            notesEl.textContent = act.notes;
+            card.appendChild(notesEl);
+          }
+
+          if (act.attachments && act.attachments.length > 0) {
+            const attEl = document.createElement("div");
+            attEl.className = "activity-attachments";
+            attEl.innerHTML =
+              "Files: " +
+              act.attachments
+                .map(
+                  (f) =>
+                    `<a href="${f.url}" target="_blank">${f.originalName}</a>`
+                )
+                .join(", ");
+            card.appendChild(attEl);
+          }
+
+          const actionsRow = document.createElement("div");
+          actionsRow.className = "activity-actions";
+
+          const delBtn = document.createElement("button");
+          delBtn.className = "btn-ghost";
+          delBtn.textContent = "Delete";
+          delBtn.addEventListener("click", () => {
+            if (
+              confirm(
+                "Delete this activity? This cannot be undone."
+              )
+            ) {
+              deleteActivity(act._id);
+            }
+          });
+
+          actionsRow.appendChild(delBtn);
+          card.appendChild(actionsRow);
+
+          activityListEl.appendChild(card);
+        });
+      }
+
+      // ====== Tables rendering ======
+      function renderActivitiesTable() {
+        activitiesTableBody.innerHTML = "";
+
+        if (!monthActivities.length) return;
+
+        monthActivities.forEach((act) => {
+          const tr = document.createElement("tr");
+
+          const tdDate = document.createElement("td");
+          tdDate.textContent = act.date;
+          tr.appendChild(tdDate);
+
+          const tdTime = document.createElement("td");
+          if (act.startTime || act.endTime) {
+            tdTime.textContent = `${act.startTime || ""} ${
+              act.endTime ? "– " + act.endTime : ""
+            }`;
+          } else {
+            tdTime.textContent = "";
+          }
+          tr.appendChild(tdTime);
+
+          const tdTitle = document.createElement("td");
+          tdTitle.textContent = act.title;
+          tr.appendChild(tdTitle);
+
+          const tdCat = document.createElement("td");
+          tdCat.innerHTML = `<span class="badge-inline">${act.category || "Other"}</span>`;
+          tr.appendChild(tdCat);
+
+          const tdPhase = document.createElement("td");
+          tdPhase.innerHTML = `<span class="badge-inline">${act.phase || ""}</span>`;
+          tr.appendChild(tdPhase);
+
+          const tdStatus = document.createElement("td");
+          tdStatus.innerHTML = `<span class="badge-inline">${act.status || ""}</span>`;
+          tr.appendChild(tdStatus);
+
+          const tdNotes = document.createElement("td");
+          tdNotes.textContent = act.notes || "";
+          tr.appendChild(tdNotes);
+
+          const tdFiles = document.createElement("td");
+          if (act.attachments && act.attachments.length > 0) {
+            tdFiles.textContent = act.attachments.length + " file(s)";
+          } else {
+            tdFiles.textContent = "-";
+          }
+          tr.appendChild(tdFiles);
+
+          activitiesTableBody.appendChild(tr);
+        });
+      }
+
+      function renderFilesTable() {
+        filesTableBody.innerHTML = "";
+
+        const rows = [];
+        monthActivities.forEach((act) => {
+          (act.attachments || []).forEach((att) => {
+            rows.push({
+              date: act.date,
+              title: act.title,
+              fileName: att.originalName,
+              sizeKB: att.size ? (att.size / 1024).toFixed(1) : "",
+              url: att.url,
+            });
+          });
+        });
+
+        if (!rows.length) return;
+
+        rows.forEach((row) => {
+          const tr = document.createElement("tr");
+
+          const tdDate = document.createElement("td");
+          tdDate.textContent = row.date;
+          tr.appendChild(tdDate);
+
+          const tdTitle = document.createElement("td");
+          tdTitle.textContent = row.title;
+          tr.appendChild(tdTitle);
+
+          const tdFile = document.createElement("td");
+          tdFile.textContent = row.fileName;
+          tr.appendChild(tdFile);
+
+          const tdSize = document.createElement("td");
+          tdSize.textContent = row.sizeKB;
+          tr.appendChild(tdSize);
+
+          const tdLink = document.createElement("td");
+          tdLink.innerHTML = `<a href="${row.url}" target="_blank">Download</a>`;
+          tr.appendChild(tdLink);
+
+          filesTableBody.appendChild(tr);
+        });
+      }
+
+      // ====== API calls ======
+      async function loadMonthActivities() {
+        const monthStr = `${currentYear}-${pad2(currentMonth + 1)}`;
+
+        try {
+          const res = await fetch(`/api/activities?month=${monthStr}`);
+          const data = await res.json();
+          if (!data.success) {
+            console.error("Failed to load activities", data);
+            return;
+          }
+          monthActivities = data.activities || [];
+          renderCalendar();
+          renderActivitiesTable();
+          renderFilesTable();
+          // Also refresh the selected day list
+          loadDayActivities();
+        } catch (err) {
+          console.error("Error loading month activities", err);
+        }
+      }
+
+      async function loadDayActivities() {
+        try {
+          const res = await fetch(
+            `/api/activities/day?date=${selectedDateStr}`
+          );
+          const data = await res.json();
+          if (!data.success) {
+            console.error("Failed to load day activities", data);
+            return;
+          }
+          renderDayActivities(data.activities || []);
+        } catch (err) {
+          console.error("Error loading day activities", err);
+        }
+      }
+
+      async function deleteActivity(id) {
+        try {
+          const res = await fetch(`/api/activities/${id}`, {
+            method: "DELETE",
+          });
+          const data = await res.json();
+          if (!data.success) {
+            alert("Failed to delete activity.");
+            return;
+          }
+          // Reload month + day
+          await loadMonthActivities();
+        } catch (err) {
+          console.error("Error deleting activity", err);
+          alert("Error deleting activity.");
+        }
+      }
+
+      // ====== Modal handling ======
+      function openActivityModal() {
+        modalContainerEl.style.display = "block";
+        modalContainerEl.innerHTML = `
+        <div class="modal-backdrop">
+          <div class="modal">
+            <div class="modal-header">
+              <div class="modal-title">Add Activity</div>
+              <button class="modal-close" id="modalCloseBtn">&times;</button>
+            </div>
+            <form id="activityForm">
+              <div class="form-group">
+                <label class="form-label">Date</label>
+                <input class="form-input" type="text" name="date" value="${selectedDateStr}" readonly />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Title</label>
+                <input class="form-input" type="text" name="title" required />
+              </div>
+
+              <div class="form-group" style="display:flex; gap:8px;">
+                <div style="flex:1;">
+                  <label class="form-label">Start Time</label>
+                  <input class="form-input" type="time" name="startTime" />
+                </div>
+                <div style="flex:1;">
+                  <label class="form-label">End Time</label>
+                  <input class="form-input" type="time" name="endTime" />
+                </div>
+              </div>
+
+              <div class="form-group" style="display:flex; gap:8px;">
+                <div style="flex:1;">
+                  <label class="form-label">Category</label>
+                  <select class="form-input" name="category">
+                    <option>Experiment</option>
+                    <option>Data Analysis</option>
+                    <option>Meeting</option>
+                    <option>Literature</option>
+                    <option>Admin</option>
+                    <option>Other</option>
+                  </select>
+                </div>
+                <div style="flex:1;">
+                  <label class="form-label">Phase / WP</label>
+                  <select class="form-input" name="phase">
+                    <option>WP1 – Material design & characterisation</option>
+                    <option>WP2 – Microsphere fabrication</option>
+                    <option>WP3 – In vitro / preclinical evaluation</option>
+                    <option>WP4 – Translation & documentation</option>
+                    <option>Other / general</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Status</label>
+                <select class="form-input" name="status">
+                  <option>Planned</option>
+                  <option>In progress</option>
+                  <option>Completed</option>
+                  <option>Delayed</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Notes / details</label>
+                <textarea class="form-input" name="notes" rows="3"></textarea>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Attachments (multiple allowed)</label>
+                <input class="form-input" type="file" name="files" multiple />
+              </div>
+
+              <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:8px;">
+                <button type="button" class="btn-ghost" id="cancelActivityBtn">Cancel</button>
+                <button type="submit" class="btn-small btn-primary">Save Activity</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      `;
+
+        document
+          .getElementById("modalCloseBtn")
+          .addEventListener("click", closeModal);
+        document
+          .getElementById("cancelActivityBtn")
+          .addEventListener("click", closeModal);
+
+        const form = document.getElementById("activityForm");
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          await submitActivityForm(form);
+        });
+      }
+
+      function closeModal() {
+        modalContainerEl.style.display = "none";
+        modalContainerEl.innerHTML = "";
+      }
+
+      async function submitActivityForm(form) {
+        const formData = new FormData(form);
+
+        try {
+          const res = await fetch("/api/activities", {
+            method: "POST",
+            body: formData,
+          });
+
+          const data = await res.json();
+          if (!data.success) {
+            alert(data.message || "Failed to save activity.");
+            return;
+          }
+          closeModal();
+          await loadMonthActivities();
+        } catch (err) {
+          console.error("Error saving activity", err);
+          alert("Error saving activity.");
+        }
+      }
+
+      // ====== Tabs handling ======
+      tabActivitiesBtn.addEventListener("click", () => {
+        tabActivitiesBtn.classList.add("active");
+        tabFilesBtn.classList.remove("active");
+        tabActivitiesPanel.style.display = "block";
+        tabFilesPanel.style.display = "none";
+      });
+
+      tabFilesBtn.addEventListener("click", () => {
+        tabFilesBtn.classList.add("active");
+        tabActivitiesBtn.classList.remove("active");
+        tabFilesPanel.style.display = "block";
+        tabActivitiesPanel.style.display = "none";
+      });
+
+      // ====== Init ======
+      function initDashboard() {
+        const now = new Date();
+        currentYear = now.getFullYear();
+        currentMonth = now.getMonth();
+        selectedDateStr = `${currentYear}-${pad2(
+          currentMonth + 1
+        )}-${pad2(now.getDate())}`;
+
+        updateSelectedDateDisplay();
+
+        document
+          .getElementById("prevMonthBtn")
+          .addEventListener("click", () => {
+            currentMonth--;
+            if (currentMonth < 0) {
+              currentMonth = 11;
+              currentYear--;
+            }
+            loadMonthActivities();
+          });
+
+        document
+          .getElementById("nextMonthBtn")
+          .addEventListener("click", () => {
+            currentMonth++;
+            if (currentMonth > 11) {
+              currentMonth = 0;
+              currentYear++;
+            }
+            loadMonthActivities();
+          });
+
+        document.getElementById("todayBtn").addEventListener("click", () => {
+          const n = new Date();
+          currentYear = n.getFullYear();
+          currentMonth = n.getMonth();
+          selectedDateStr = `${currentYear}-${pad2(
+            currentMonth + 1
+          )}-${pad2(n.getDate())}`;
+          updateSelectedDateDisplay();
+          loadMonthActivities();
+        });
+
+        document
+          .getElementById("addActivityBtn")
+          .addEventListener("click", openActivityModal);
+
+        loadMonthActivities();
+      }
+
+      document.addEventListener("DOMContentLoaded", initDashboard);
+    </script>
   </body>
 </html>
