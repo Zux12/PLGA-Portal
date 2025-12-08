@@ -882,6 +882,15 @@
           .getElementById("addActivityBtn")
           .addEventListener("click", openActivityModal);
 
+        // NEW: open print view for current month
+        document
+          .getElementById("openPrintViewBtn")
+          .addEventListener("click", () => {
+            const monthStr = `${currentYear}-${pad2(currentMonth + 1)}`;
+            window.open(`/staff-print.html?month=${monthStr}`, "_blank");
+          });
+
+        
         loadMonthActivities();
       }
 
