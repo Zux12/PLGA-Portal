@@ -675,3 +675,96 @@ body {
     display: none;
   }
 }
+
+
+/* ===== Print view styles ===== */
+
+.print-header {
+  margin-bottom: 16px;
+}
+
+.print-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.print-subtitle {
+  font-size: 0.95rem;
+  color: #4b5563;
+  margin-bottom: 10px;
+}
+
+.print-meta {
+  font-size: 0.85rem;
+  color: #4b5563;
+  margin-bottom: 12px;
+}
+
+.print-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.print-controls label {
+  font-size: 0.85rem;
+  color: #374151;
+}
+
+.print-summary {
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+}
+
+.print-summary ul {
+  padding-left: 18px;
+}
+
+.print-summary li {
+  margin-bottom: 2px;
+}
+
+.print-signature {
+  margin-top: 24px;
+  font-size: 0.85rem;
+}
+
+.print-signature-line {
+  margin-top: 18px;
+  display: flex;
+  justify-content: space-between;
+  gap: 40px;
+}
+
+.print-signature-line div {
+  flex: 1;
+}
+
+/* Hide some elements when printing */
+@media print {
+  body {
+    background: white;
+  }
+
+  .print-controls {
+    display: none;
+  }
+
+  .navbar,
+  .section-subtitle {
+    display: none;
+  }
+
+  .container {
+    max-width: 100%;
+    padding: 10px 10px 0;
+  }
+
+  .tab-panel,
+  .data-table {
+    box-shadow: none;
+  }
+}
