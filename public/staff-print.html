@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Monthly Report – PLGA Staff Portal</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/css/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header class="navbar">
+        <div class="navbar-brand">PLGA Staff Monthly Report</div>
+        <nav class="nav-links">
+          <a href="/staff-dashboard.html">Back to Dashboard</a>
+        </nav>
+      </header>
+
+      <section class="section">
+        <div class="print-header">
+          <h1 class="print-title">
+            Porous PLGA Microspheres for Advanced Bone Grafting
+          </h1>
+          <p class="print-subtitle">Monthly Activity Log / Time Sheet</p>
+          <div class="print-meta" id="reportMeta">
+            <!-- filled by JS -->
+          </div>
+        </div>
+
+        <div class="print-controls">
+          <div>
+            <label for="monthInput">Select month:</label><br />
+            <input type="month" id="monthInput" class="form-input" style="width:auto; padding:4px 8px; font-size:0.85rem;" />
+          </div>
+          <div>
+            <button
+              type="button"
+              class="btn-small btn-outline"
+              onclick="window.print()"
+            >
+              Print / Save as PDF
+            </button>
+          </div>
+        </div>
+
+        <div class="print-summary">
+          <strong>Summary for this month:</strong>
+          <ul id="summaryList">
+            <!-- filled by JS -->
+          </ul>
+        </div>
+
+        <div class="tab-panel">
+          <div class="table-wrapper">
+            <table class="data-table" id="reportTable">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Date / Range</th>
+                  <th>Time</th>
+                  <th>Title</th>
+                  <th>Category</th>
+                  <th>Phase / WP</th>
+                  <th>Status</th>
+                  <th>Notes / details</th>
+                  <th>Files</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- filled by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="print-signature">
+          <div class="print-signature-line">
+            <div>
+              Prepared by: ___________________________<br />
+              Date: __________________
+            </div>
+            <div>
+              Reviewed by: ___________________________<br />
+              Date: __________________
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      // Helpers (similar to dashboard)
+      function pad2(n) {
+        return n.toString().padStart(2, "0");
+      }
+
+      function getMonthLabel(year, monthIndex) {
+        const date = new Date(year, monthIndex, 1);
+        const options = { month: "long", year: "numeric" };
+        return date.toLocaleDateString(undefined, options);
+      }
+
+      function getDateRangeText(act) {
+        if (!act.endDate || act.endDate === act.date) return act.date;
+        return act.date + " \u2192 " + act.endDate;
+      }
+
+      // Parse ?month=YYYY-MM
+      function getQueryMonth() {
+        const params = new URLSearchParams(window.location.search);
+        const m = params.get("month");
+        if (m && /^\d{4}-\d{2}$/.test(m)) return m;
+        const now = new Date();
+        return now.getFullYear() + "-" + pad2(now.getMonth() + 1);
+      }
+
+      const monthInput = document.getElementById("monthInput");
+      const reportMetaEl = document.getElementById("reportMeta");
+      const summaryListEl = document.getElementById("summaryList");
+      const reportTableBody = document
+        .getElementById("reportTable")
+        .querySelector("tbody");
+
+      let currentMonthStr = getQueryMonth(); // YYYY-MM
+
+      async function loadMonthReport() {
+        try {
+          const res = await fetch("/api/activities?month=" + currentMonthStr);
+          const data = await res.json();
+          if (!data.success) {
+            console.error("Failed to load report data", data);
+            return;
+          }
+          const activities = data.activities || [];
+          renderReportMeta(activities);
+          renderSummary(activities);
+          renderTable(activities);
+        } catch (err) {
+          console.error("Error loading report", err);
+        }
+      }
+
+      function renderReportMeta(activities) {
+        const year = parseInt(currentMonthStr.slice(0, 4), 10);
+        const monthIndex = parseInt(currentMonthStr.slice(5, 7), 10) - 1;
+        const label = getMonthLabel(year, monthIndex);
+
+        const today = new Date();
+        const todayStr =
+          today.getFullYear() +
+          "-" +
+          pad2(today.getMonth() + 1) +
+          "-" +
+          pad2(today.getDate());
+
+        reportMetaEl.textContent =
+          "Reporting month: " +
+          label +
+          " | Generated on: " +
+          todayStr +
+          " | Total activities: " +
+          activities.length;
+      }
+
+      function renderSummary(activities) {
+        summaryListEl.innerHTML = "";
+
+        if (!activities.length) {
+          const li = document.createElement("li");
+          li.textContent = "No activities recorded for this month.";
+          summaryListEl.appendChild(li);
+          return;
+        }
+
+        const categoryCounts = {};
+        const statusCounts = {};
+        const datesWithActivities = new Set();
+
+        activities.forEach((act) => {
+          const cat = (act.category || "Other").toLowerCase();
+          categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+
+          const status = (act.status || "Planned").toLowerCase();
+          statusCounts[status] = (statusCounts[status] || 0) + 1;
+
+          // Count days covered by the activity in this month
+          const start = act.date;
+          const end = act.endDate || act.date;
+          let d = new Date(start);
+          const endDateObj = new Date(end);
+
+          while (d <= endDateObj) {
+            const ds =
+              d.getFullYear() +
+              "-" +
+              pad2(d.getMonth() + 1) +
+              "-" +
+              pad2(d.getDate());
+            if (ds.startsWith(currentMonthStr)) {
+              datesWithActivities.add(ds);
+            }
+            d.setDate(d.getDate() + 1);
+          }
+        });
+
+        const total = activities.length;
+        const liTotal = document.createElement("li");
+        liTotal.textContent = "Total activities: " + total;
+        summaryListEl.appendChild(liTotal);
+
+        const liDays = document.createElement("li");
+        liDays.textContent =
+          "Number of days with at least one activity: " +
+          datesWithActivities.size;
+        summaryListEl.appendChild(liDays);
+
+        const cats = Object.keys(categoryCounts);
+        if (cats.length) {
+          const liCats = document.createElement("li");
+          liCats.textContent =
+            "By category: " +
+            cats
+              .map(
+                (c) =>
+                  c +
+                  " (" +
+                  categoryCounts[c] +
+                  ")"
+              )
+              .join(", ");
+          summaryListEl.appendChild(liCats);
+        }
+
+        const stats = Object.keys(statusCounts);
+        if (stats.length) {
+          const liStats = document.createElement("li");
+          liStats.textContent =
+            "By status: " +
+            stats
+              .map(
+                (s) =>
+                  s +
+                  " (" +
+                  statusCounts[s] +
+                  ")"
+              )
+              .join(", ");
+          summaryListEl.appendChild(liStats);
+        }
+      }
+
+      function renderTable(activities) {
+        reportTableBody.innerHTML = "";
+
+        if (!activities.length) return;
+
+        activities.forEach((act, index) => {
+          const tr = document.createElement("tr");
+
+          const tdIndex = document.createElement("td");
+          tdIndex.textContent = index + 1;
+          tr.appendChild(tdIndex);
+
+          const tdDate = document.createElement("td");
+          tdDate.textContent = getDateRangeText(act);
+          tr.appendChild(tdDate);
+
+          const tdTime = document.createElement("td");
+          if (act.isFullDay) {
+            tdTime.textContent = "All day";
+          } else if (act.startTime || act.endTime) {
+            tdTime.textContent =
+              (act.startTime || "") +
+              (act.endTime ? " – " + act.endTime : "");
+          } else {
+            tdTime.textContent = "";
+          }
+          tr.appendChild(tdTime);
+
+          const tdTitle = document.createElement("td");
+          tdTitle.textContent = act.title;
+          tr.appendChild(tdTitle);
+
+          const tdCat = document.createElement("td");
+          tdCat.textContent = act.category || "";
+          tr.appendChild(tdCat);
+
+          const tdPhase = document.createElement("td");
+          tdPhase.textContent = act.phase || "";
+          tr.appendChild(tdPhase);
+
+          const tdStatus = document.createElement("td");
+          tdStatus.textContent = act.status || "";
+          tr.appendChild(tdStatus);
+
+          const tdNotes = document.createElement("td");
+          tdNotes.textContent = act.notes || "";
+          tr.appendChild(tdNotes);
+
+          const tdFiles = document.createElement("td");
+          if (act.attachments && act.attachments.length > 0) {
+            tdFiles.textContent = act.attachments.length + " file(s)";
+          } else {
+            tdFiles.textContent = "-";
+          }
+          tr.appendChild(tdFiles);
+
+          reportTableBody.appendChild(tr);
+        });
+      }
+
+      // Init
+      function initPrintPage() {
+        // Set initial month input
+        monthInput.value = currentMonthStr;
+
+        monthInput.addEventListener("change", () => {
+          const v = monthInput.value; // YYYY-MM
+          if (v && /^\d{4}-\d{2}$/.test(v)) {
+            currentMonthStr = v;
+            loadMonthReport();
+          }
+        });
+
+        loadMonthReport();
+      }
+
+      document.addEventListener("DOMContentLoaded", initPrintPage);
+    </script>
+  </body>
+</html>
