@@ -108,7 +108,7 @@
               <table class="data-table" id="activitiesTable">
                 <thead>
                   <tr>
-                    <th>Date</th>
+                    <th>Date / Range</th>
                     <th>Time</th>
                     <th>Title</th>
                     <th>Category</th>
@@ -134,7 +134,7 @@
               <table class="data-table" id="filesTable">
                 <thead>
                   <tr>
-                    <th>Date</th>
+                    <th>Date / Range</th>
                     <th>Activity</th>
                     <th>File Name</th>
                     <th>Size (KB)</th>
@@ -213,6 +213,11 @@
         return "dot-other";
       }
 
+      function getDateRangeText(act) {
+        if (!act.endDate || act.endDate === act.date) return act.date;
+        return `${act.date} → ${act.endDate}`;
+      }
+
       // ====== Calendar rendering ======
       function renderCalendar() {
         calendarGridEl.innerHTML = "";
@@ -224,7 +229,7 @@
           0
         ).getDate();
 
-        // Monday-first layout: convert JS getDay() (0=Sun) => 0=Mon
+        // Monday-first layout
         const firstDayIndex = (firstDay.getDay() + 6) % 7;
 
         const daysFromPrevMonth = firstDayIndex;
@@ -245,21 +250,53 @@
           calendarGridEl.appendChild(el);
         });
 
-        // Precompute stats per date
+        // Precompute stats per date for this month (by overlapping ranges)
         const statsByDate = {};
         monthActivities.forEach((act) => {
-          const date = act.date;
-          if (!statsByDate[date]) {
-            statsByDate[date] = {
-              count: 0,
-              categories: new Set(),
-              hasAttachments: false,
-            };
+          const start = act.date;
+          const end = act.endDate || act.date;
+
+          const [y, m] = [
+            parseInt(start.slice(0, 4), 10),
+            parseInt(start.slice(5, 7), 10),
+          ];
+          const yearStr = currentYear.toString();
+          const monthStr = pad2(currentMonth + 1);
+          const monthFirst = `${yearStr}-${monthStr}-01`;
+          const monthLast = `${yearStr}-${monthStr}-${pad2(daysInMonth)}`;
+
+          // Check if this activity overlaps this month at all
+          if (start > monthLast || end < monthFirst) {
+            return; // no overlap with this month
           }
-          statsByDate[date].count += 1;
-          statsByDate[date].categories.add(act.category || "Other");
-          if (act.attachments && act.attachments.length > 0) {
-            statsByDate[date].hasAttachments = true;
+
+          // For simplicity in stats: mark every date in its range that falls in this month
+          let d = new Date(start);
+          const endDateObj = new Date(end);
+          while (d <= endDateObj) {
+            const ds = `${d.getFullYear()}-${pad2(
+              d.getMonth() + 1
+            )}-${pad2(d.getDate())}`;
+
+            if (
+              d.getFullYear() === currentYear &&
+              d.getMonth() === currentMonth
+            ) {
+              if (!statsByDate[ds]) {
+                statsByDate[ds] = {
+                  count: 0,
+                  categories: new Set(),
+                  hasAttachments: false,
+                };
+              }
+              statsByDate[ds].count += 1;
+              statsByDate[ds].categories.add(act.category || "Other");
+              if (act.attachments && act.attachments.length > 0) {
+                statsByDate[ds].hasAttachments = true;
+              }
+            }
+
+            d.setDate(d.getDate() + 1);
           }
         });
 
@@ -369,7 +406,10 @@
 
           const timeEl = document.createElement("div");
           timeEl.className = "activity-time";
-          if (act.startTime || act.endTime) {
+
+          if (act.isFullDay) {
+            timeEl.textContent = "All day";
+          } else if (act.startTime || act.endTime) {
             timeEl.textContent = `${act.startTime || "?"} – ${
               act.endTime || "?"
             }`;
@@ -383,6 +423,11 @@
 
           const tagsRow = document.createElement("div");
           tagsRow.className = "activity-tags";
+
+          const rangeChip = document.createElement("span");
+          rangeChip.className = "tag-chip";
+          rangeChip.textContent = getDateRangeText(act);
+          tagsRow.appendChild(rangeChip);
 
           const catChip = document.createElement("span");
           catChip.className = "tag-chip tag-category";
@@ -455,11 +500,13 @@
           const tr = document.createElement("tr");
 
           const tdDate = document.createElement("td");
-          tdDate.textContent = act.date;
+          tdDate.textContent = getDateRangeText(act);
           tr.appendChild(tdDate);
 
           const tdTime = document.createElement("td");
-          if (act.startTime || act.endTime) {
+          if (act.isFullDay) {
+            tdTime.textContent = "All day";
+          } else if (act.startTime || act.endTime) {
             tdTime.textContent = `${act.startTime || ""} ${
               act.endTime ? "– " + act.endTime : ""
             }`;
@@ -507,7 +554,7 @@
         monthActivities.forEach((act) => {
           (act.attachments || []).forEach((att) => {
             rows.push({
-              date: act.date,
+              dateRange: getDateRangeText(act),
               title: act.title,
               fileName: att.originalName,
               sizeKB: att.size ? (att.size / 1024).toFixed(1) : "",
@@ -522,7 +569,7 @@
           const tr = document.createElement("tr");
 
           const tdDate = document.createElement("td");
-          tdDate.textContent = row.date;
+          tdDate.textContent = row.dateRange;
           tr.appendChild(tdDate);
 
           const tdTitle = document.createElement("td");
@@ -612,14 +659,22 @@
               <button class="modal-close" id="modalCloseBtn">&times;</button>
             </div>
             <form id="activityForm">
-              <div class="form-group">
-                <label class="form-label">Date</label>
-                <input class="form-input" type="text" name="date" value="${selectedDateStr}" readonly />
+              <div class="form-group" style="display:flex; gap:8px;">
+                <div style="flex:1;">
+                  <label class="form-label">From (date)</label>
+                  <input class="form-input" type="date" name="date" value="${selectedDateStr}" required />
+                </div>
+                <div style="flex:1;">
+                  <label class="form-label">To (date)</label>
+                  <input class="form-input" type="date" name="endDate" value="${selectedDateStr}" required />
+                </div>
               </div>
 
               <div class="form-group">
-                <label class="form-label">Title</label>
-                <input class="form-input" type="text" name="title" required />
+                <label class="form-label">
+                  <input type="checkbox" name="isFullDay" style="margin-right:6px;">
+                  Full day activity
+                </label>
               </div>
 
               <div class="form-group" style="display:flex; gap:8px;">
@@ -694,6 +749,24 @@
           .addEventListener("click", closeModal);
 
         const form = document.getElementById("activityForm");
+        const fullDayCheckbox = form.querySelector('input[name="isFullDay"]');
+        const startTimeInput = form.querySelector(
+          'input[name="startTime"]'
+        );
+        const endTimeInput = form.querySelector('input[name="endTime"]');
+
+        fullDayCheckbox.addEventListener("change", () => {
+          if (fullDayCheckbox.checked) {
+            startTimeInput.value = "";
+            endTimeInput.value = "";
+            startTimeInput.disabled = true;
+            endTimeInput.disabled = true;
+          } else {
+            startTimeInput.disabled = false;
+            endTimeInput.disabled = false;
+          }
+        });
+
         form.addEventListener("submit", async (e) => {
           e.preventDefault();
           await submitActivityForm(form);
