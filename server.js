@@ -54,6 +54,11 @@ mongoose
     console.error("❌ MongoDB connection error:", err);
   });
 
+// Small helper
+function pad2(n) {
+  return n.toString().padStart(2, "0");
+}
+
 // --- Activity Schema & Model ---
 const attachmentSchema = new mongoose.Schema(
   {
@@ -68,7 +73,13 @@ const attachmentSchema = new mongoose.Schema(
 );
 
 const activitySchema = new mongoose.Schema({
+  // Start date of activity
   date: { type: String, required: true }, // YYYY-MM-DD
+  // End date of activity (>= date)
+  endDate: { type: String, required: true },
+  // Full day flag (ignores time if true)
+  isFullDay: { type: Boolean, default: false },
+
   title: { type: String, required: true },
   category: { type: String, default: "Other" },
   phase: { type: String, default: "Unspecified" },
@@ -104,8 +115,9 @@ app.post(
   upload.array("files", 10),
   async (req, res) => {
     try {
-      const {
-        date,
+      let {
+        date, // start date
+        endDate,
         title,
         category,
         phase,
@@ -113,12 +125,32 @@ app.post(
         startTime,
         endTime,
         notes,
+        isFullDay,
       } = req.body;
 
       if (!date || !title) {
         return res
           .status(400)
           .json({ success: false, message: "Date and title are required." });
+      }
+
+      // Normalise endDate
+      if (!endDate) {
+        endDate = date;
+      }
+
+      // Make sure endDate >= date (string compare works for YYYY-MM-DD)
+      if (endDate < date) {
+        endDate = date;
+      }
+
+      const fullDayFlag =
+        isFullDay === "true" || isFullDay === "on" || isFullDay === true;
+
+      // If full day, clear times
+      if (fullDayFlag) {
+        startTime = "";
+        endTime = "";
       }
 
       const attachments = (req.files || []).map((file) => ({
@@ -131,6 +163,8 @@ app.post(
 
       const activity = new Activity({
         date,
+        endDate,
+        isFullDay: fullDayFlag,
         title,
         category,
         phase,
@@ -151,7 +185,7 @@ app.post(
   }
 );
 
-// Get activities for a given month for calendar & tables
+// Get activities overlapping a given month
 // Query: ?month=YYYY-MM
 app.get("/api/activities", async (req, res) => {
   try {
@@ -159,9 +193,20 @@ app.get("/api/activities", async (req, res) => {
 
     let filter = {};
     if (month) {
-      // match date starting with "YYYY-MM-"
-      const regex = new RegExp("^" + month + "-");
-      filter.date = { $regex: regex };
+      const [yearStr, monthStr] = month.split("-");
+      const y = parseInt(yearStr, 10);
+      const m = parseInt(monthStr, 10); // 1-12
+
+      const startOfMonth = `${yearStr}-${monthStr}-01`;
+      const lastDayNum = new Date(y, m, 0).getDate(); // JS month m means next month index
+      const endOfMonth = `${yearStr}-${monthStr}-${pad2(lastDayNum)}`;
+
+      // Activities that overlap this month:
+      // start date <= endOfMonth AND endDate >= startOfMonth
+      filter = {
+        date: { $lte: endOfMonth },
+        endDate: { $gte: startOfMonth },
+      };
     }
 
     const activities = await Activity.find(filter).sort({
@@ -177,7 +222,7 @@ app.get("/api/activities", async (req, res) => {
   }
 });
 
-// Get activities for a specific date
+// Get activities for a specific date (any activity whose range covers that date)
 // Query: ?date=YYYY-MM-DD
 app.get("/api/activities/day", async (req, res) => {
   try {
@@ -188,7 +233,11 @@ app.get("/api/activities/day", async (req, res) => {
         .json({ success: false, message: "Date is required." });
     }
 
-    const activities = await Activity.find({ date }).sort({
+    const activities = await Activity.find({
+      date: { $lte: date },
+      endDate: { $gte: date },
+    }).sort({
+      date: 1,
       startTime: 1,
       createdAt: 1,
     });
