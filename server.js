@@ -17,12 +17,13 @@ app.use(express.urlencoded({ extended: true }));
 // Serve static files from /public
 app.use(express.static("public"));
 
-// Serve uploaded files
-const uploadsDir = path.join(__dirname, "uploads");
+// Serve uploaded files from /public/uploads
+const uploadsDir = path.join(__dirname, "public", "uploads");
 if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir);
+  fs.mkdirSync(uploadsDir, { recursive: true });
 }
 app.use("/uploads", express.static(uploadsDir));
+
 
 // --- Multer setup for file uploads ---
 const storage = multer.diskStorage({
