@@ -751,10 +751,19 @@
                 <input class="form-input" type="file" name="files" multiple />
               </div>
 
-              <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:8px;">
-                <button type="button" class="btn-ghost" id="cancelActivityBtn">Cancel</button>
-                <button type="submit" class="btn-small btn-primary">Save Activity</button>
-              </div>
+<div style="display:flex; justify-content:flex-end; gap:8px; margin-top:8px;">
+  <button type="button" class="btn-ghost" id="cancelActivityBtn">Cancel</button>
+  <button type="submit" class="btn-small btn-primary" id="saveActivityBtn">
+    Save Activity
+  </button>
+</div>
+<div
+  id="activitySavingIndicator"
+  style="font-size:0.8rem;color:#6b7280;display:none;margin-top:6px;text-align:right;"
+>
+  Saving activity, please wait...
+</div>
+
             </form>
           </div>
         </div>
@@ -797,27 +806,65 @@
         modalContainerEl.innerHTML = "";
       }
 
-      async function submitActivityForm(form) {
-        const formData = new FormData(form);
+async function submitActivityForm(form) {
+  const formData = new FormData(form);
 
-        try {
-          const res = await fetch("/api/activities", {
-            method: "POST",
-            body: formData,
-          });
+  // Progress UI elements
+  const saveBtn = form.querySelector("#saveActivityBtn");
+  const cancelBtn = form.querySelector("#cancelActivityBtn");
+  const indicator = form.querySelector("#activitySavingIndicator");
 
-          const data = await res.json();
-          if (!data.success) {
-            alert(data.message || "Failed to save activity.");
-            return;
-          }
-          closeModal();
-          await loadMonthActivities();
-        } catch (err) {
-          console.error("Error saving activity", err);
-          alert("Error saving activity.");
-        }
+  // Show "saving" state
+  if (indicator) indicator.style.display = "block";
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
+  }
+  if (cancelBtn) {
+    cancelBtn.disabled = true;
+  }
+
+  try {
+    const res = await fetch("/api/activities", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await res.json();
+    if (!data.success) {
+      alert(data.message || "Failed to save activity.");
+
+      // Reset UI since modal stays open
+      if (indicator) indicator.style.display = "none";
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Save Activity";
       }
+      if (cancelBtn) {
+        cancelBtn.disabled = false;
+      }
+      return;
+    }
+
+    // Success: close modal and refresh
+    closeModal();
+    await loadMonthActivities();
+  } catch (err) {
+    console.error("Error saving activity", err);
+    alert("Error saving activity.");
+
+    // Reset UI since modal stays open
+    if (indicator) indicator.style.display = "none";
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Save Activity";
+    }
+    if (cancelBtn) {
+      cancelBtn.disabled = false;
+    }
+  }
+}
+
 
       // ====== Tabs handling ======
       tabActivitiesBtn.addEventListener("click", () => {
