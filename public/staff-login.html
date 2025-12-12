@@ -3,47 +3,246 @@
   <head>
     <meta charset="UTF-8" />
     <title>Staff Login – PLGA Bone Graft Portal</title>
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="/css/styles.css" />
+
+    <!-- UI Enhancement (safe override) -->
+    <style>
+      :root {
+        --bg1:#f6f9ff;
+        --bg2:#eef6f2;
+        --card:#ffffff;
+        --text:#0f172a;
+        --muted:#475569;
+        --border:#e2e8f0;
+        --primary:#16a34a;
+        --primary2:#22c55e;
+        --ring:rgba(34,197,94,.25);
+        --danger:#ef4444;
+      }
+
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+        color: var(--text);
+      }
+
+      .auth-page {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background:
+          radial-gradient(800px 400px at 10% 20%, rgba(34,197,94,.12), transparent 55%),
+          radial-gradient(800px 400px at 90% 20%, rgba(59,130,246,.10), transparent 55%),
+          linear-gradient(180deg, var(--bg1), var(--bg2));
+      }
+
+      .auth-card {
+        width: 100%;
+        max-width: 420px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        box-shadow: 0 18px 50px rgba(15,23,42,.10);
+        padding: 22px;
+        position: relative;
+      }
+
+      .auth-card::before {
+        content: "";
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 5px;
+        background: linear-gradient(90deg, var(--primary), #06b6d4, #3b82f6);
+        border-radius: 18px 18px 0 0;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+
+      .brand-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(135deg, var(--primary), var(--primary2));
+        color: #fff;
+        font-weight: 800;
+        box-shadow: 0 10px 22px rgba(34,197,94,.22);
+      }
+
+      .brand-text {
+        line-height: 1.1;
+      }
+
+      .brand-title {
+        font-weight: 800;
+        font-size: 14px;
+      }
+
+      .brand-sub {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 4px;
+      }
+
+      .auth-title {
+        font-size: 22px;
+        font-weight: 800;
+        margin: 10px 0 6px;
+      }
+
+      .auth-subtitle {
+        font-size: 13.5px;
+        color: var(--muted);
+        margin-bottom: 16px;
+        line-height: 1.45;
+      }
+
+      .auth-error {
+        background: rgba(239,68,68,.08);
+        border: 1px solid rgba(239,68,68,.35);
+        color: #991b1b;
+        padding: 10px 12px;
+        border-radius: 12px;
+        font-size: 13px;
+        margin-bottom: 14px;
+      }
+
+      .form-group { margin-bottom: 12px; }
+
+      .form-label {
+        font-size: 12.5px;
+        color: var(--muted);
+        margin-bottom: 6px;
+        display: block;
+      }
+
+      .form-input {
+        width: 100%;
+        padding: 11px 12px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        font-size: 14px;
+        outline: none;
+        transition: box-shadow .15s ease, border-color .15s ease;
+      }
+
+      .form-input:focus {
+        border-color: rgba(34,197,94,.55);
+        box-shadow: 0 0 0 4px var(--ring);
+      }
+
+      .password-row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .toggle-btn {
+        border: 1px solid var(--border);
+        background: #fff;
+        border-radius: 12px;
+        padding: 10px 12px;
+        cursor: pointer;
+      }
+
+      .btn-small.btn-primary {
+        width: 100%;
+        padding: 12px;
+        font-size: 14px;
+        font-weight: 700;
+        border-radius: 12px;
+        border: none;
+        cursor: pointer;
+        color: #fff;
+        background: linear-gradient(135deg, var(--primary), var(--primary2));
+        box-shadow: 0 14px 28px rgba(34,197,94,.22);
+      }
+
+      .btn-small.btn-primary:disabled {
+        opacity: .7;
+        cursor: not-allowed;
+      }
+
+      .status-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 8px;
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #94a3b8;
+        display: inline-block;
+        margin-right: 6px;
+      }
+
+      .dot.ok { background: #22c55e; }
+
+      .auth-footer {
+        margin-top: 14px;
+        font-size: 12.5px;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+    </style>
   </head>
+
   <body>
     <div class="auth-page">
       <div class="auth-card">
+        <div class="brand">
+          <div class="brand-icon">PLGA</div>
+          <div class="brand-text">
+            <div class="brand-title">PLGA Bone Graft Portal</div>
+            <div class="brand-sub">Staff access · Research & Documentation</div>
+          </div>
+        </div>
+
         <h1 class="auth-title">Staff Portal Login</h1>
         <p class="auth-subtitle">
           Restricted area for project research assistants and team members.
         </p>
 
-        <div id="error" class="auth-error" style="display: none;"></div>
+        <div id="error" class="auth-error" style="display:none;"></div>
 
         <div class="form-group">
           <label class="form-label" for="username">Username</label>
-          <input
-            class="form-input"
-            type="text"
-            id="username"
-            placeholder="staff"
-            autocomplete="username"
-          />
+          <input class="form-input" type="text" id="username"
+            placeholder="staff" autocomplete="username" />
         </div>
 
         <div class="form-group">
           <label class="form-label" for="password">Password</label>
-          <input
-            class="form-input"
-            type="password"
-            id="password"
-            placeholder="••••••••"
-            autocomplete="current-password"
-          />
+          <div class="password-row">
+            <input class="form-input" type="password" id="password"
+              placeholder="••••••••" autocomplete="current-password" />
+            <button type="button" class="toggle-btn" id="togglePw">👁️</button>
+          </div>
         </div>
 
-        <button id="loginBtn" class="btn-small btn-primary" style="width: 100%;">
-          Login
-        </button>
+        <button id="loginBtn" class="btn-small btn-primary">Login</button>
+
+        <div class="status-row">
+          <div>
+            <span id="dot" class="dot"></span>
+            <span id="statusText">Ready</span>
+          </div>
+          <div>© 2025–2026</div>
+        </div>
 
         <p class="auth-footer">
           After successful login, you will be redirected to the staff dashboard
@@ -53,24 +252,42 @@
     </div>
 
     <script>
-      document.getElementById("loginBtn").addEventListener("click", async () => {
+      const loginBtn = document.getElementById("loginBtn");
+      const errorEl = document.getElementById("error");
+      const statusText = document.getElementById("statusText");
+      const dot = document.getElementById("dot");
+
+      function setStatus(text, ok = false) {
+        statusText.textContent = text;
+        dot.className = "dot" + (ok ? " ok" : "");
+      }
+
+      document.getElementById("togglePw").addEventListener("click", () => {
+        const pw = document.getElementById("password");
+        pw.type = pw.type === "password" ? "text" : "password";
+      });
+
+      loginBtn.addEventListener("click", async () => {
         const username = document.getElementById("username").value.trim();
         const password = document.getElementById("password").value.trim();
-        const errorEl = document.getElementById("error");
         errorEl.style.display = "none";
 
         if (!username || !password) {
           errorEl.textContent = "Please enter both username and password.";
           errorEl.style.display = "block";
+          setStatus("Missing credentials");
           return;
         }
+
+        loginBtn.disabled = true;
+        const originalText = loginBtn.textContent;
+        loginBtn.textContent = "Logging in...";
+        setStatus("Connecting...");
 
         try {
           const res = await fetch("/api/login", {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ username, password }),
           });
 
@@ -79,26 +296,26 @@
           if (!res.ok || !data.success) {
             errorEl.textContent = data.message || "Login failed.";
             errorEl.style.display = "block";
+            setStatus("Login failed");
             return;
           }
 
-          // For now, simple redirect. Later we can add proper auth tokens.
+          setStatus("Authenticated", true);
           window.location.href = "/staff-dashboard.html";
         } catch (err) {
           errorEl.textContent = "Unable to connect to server.";
           errorEl.style.display = "block";
+          setStatus("Server unreachable");
           console.error(err);
+        } finally {
+          loginBtn.disabled = false;
+          loginBtn.textContent = originalText;
         }
       });
 
-      // Allow Enter key to submit
-      document
-        .getElementById("password")
-        .addEventListener("keyup", function (event) {
-          if (event.key === "Enter") {
-            document.getElementById("loginBtn").click();
-          }
-        });
+      document.getElementById("password").addEventListener("keyup", (e) => {
+        if (e.key === "Enter") loginBtn.click();
+      });
     </script>
   </body>
 </html>
